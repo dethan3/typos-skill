@@ -26,6 +26,13 @@ def parse_int(value):
     return None
 
 
+def resolve_target_path(review_path, target):
+    candidate = Path(str(target))
+    if not candidate.is_absolute():
+        candidate = review_path.parent / candidate
+    return str(candidate.resolve(strict=False))
+
+
 def line_starts(data):
     starts = [0]
     for idx, byte in enumerate(data):
@@ -34,7 +41,7 @@ def line_starts(data):
     return starts
 
 
-def locate_offset(data, line_num, needle):
+def locate_offset(data, line_num, needle, occurrence_index=None):
     if line_num is None or line_num < 1:
         return None
     starts = line_starts(data)
@@ -43,12 +50,25 @@ def locate_offset(data, line_num, needle):
     start = starts[line_num - 1]
     end = starts[line_num] if line_num < len(starts) else len(data)
     segment = data[start:end]
-    first = segment.find(needle)
-    if first == -1:
+    positions = []
+    cursor = segment.find(needle)
+    while cursor != -1:
+        positions.append(cursor)
+        cursor = segment.find(needle, cursor + 1)
+
+    if not positions:
         return None
-    if segment.find(needle, first + 1) != -1:
-        raise ValueError("multiple occurrences on the same line")
-    return start + first
+
+    if occurrence_index is None:
+        if len(positions) > 1:
+            raise ValueError("multiple occurrences on the same line")
+        return start + positions[0]
+
+    if occurrence_index < 1:
+        raise ValueError("occurrence_index must be >= 1")
+    if occurrence_index > len(positions):
+        return None
+    return start + positions[occurrence_index - 1]
 
 
 def load_review(path):
@@ -85,9 +105,13 @@ def load_review(path):
             if not file_path or not typo:
                 errors.append(f"{path}:{idx}: missing path or typo")
                 continue
+            resolved_path = resolve_target_path(path, file_path)
 
             corrections = item.get("corrections") or []
             custom = item.get("correction")
+            line_num = parse_int(item.get("line_num"))
+            byte_offset = parse_int(item.get("byte_offset"))
+            occurrence_index = parse_int(item.get("occurrence_index"))
 
             if status == "CUSTOM":
                 if not custom:
@@ -103,13 +127,21 @@ def load_review(path):
                     errors.append(f"{path}:{idx}: no correction available")
                     continue
 
+            if byte_offset is None and line_num is None:
+                errors.append(f"{path}:{idx}: missing locator; provide byte_offset or line_num")
+                continue
+            if occurrence_index is not None and occurrence_index < 1:
+                errors.append(f"{path}:{idx}: occurrence_index must be >= 1")
+                continue
+
             accepted.append(
                 {
-                    "path": file_path,
+                    "path": resolved_path,
                     "typo": typo,
                     "correction": correction,
-                    "line_num": parse_int(item.get("line_num")),
-                    "byte_offset": parse_int(item.get("byte_offset")),
+                    "line_num": line_num,
+                    "byte_offset": byte_offset,
+                    "occurrence_index": occurrence_index,
                 }
             )
 
@@ -140,17 +172,36 @@ def build_plan(changes):
 
             if item["byte_offset"] is not None:
                 offset = item["byte_offset"]
+                if offset < 0:
+                    errors.append(f"{path}: byte_offset must be >= 0 for '{item['typo']}'")
+                    continue
                 if data[offset:offset + len(typo_bytes)] != typo_bytes:
                     errors.append(f"{path}: byte_offset mismatch for '{item['typo']}'")
                     continue
             else:
                 try:
-                    offset = locate_offset(data, item["line_num"], typo_bytes)
+                    offset = locate_offset(
+                        data,
+                        item["line_num"],
+                        typo_bytes,
+                        item["occurrence_index"],
+                    )
                 except ValueError as exc:
-                    errors.append(f"{path}: {exc} for '{item['typo']}' on line {item['line_num']}")
+                    errors.append(
+                        f"{path}: {exc} for '{item['typo']}' on line {item['line_num']}; "
+                        "keep byte_offset from export or set occurrence_index"
+                    )
                     continue
                 if offset is None:
-                    errors.append(f"{path}: unable to locate '{item['typo']}' on line {item['line_num']}")
+                    if item["occurrence_index"] is not None:
+                        errors.append(
+                            f"{path}: unable to locate occurrence {item['occurrence_index']} "
+                            f"of '{item['typo']}' on line {item['line_num']}"
+                        )
+                    else:
+                        errors.append(
+                            f"{path}: unable to locate '{item['typo']}' on line {item['line_num']}"
+                        )
                     continue
 
             replacements.append((offset, len(typo_bytes), correction_bytes))

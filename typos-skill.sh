@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 usage() {
     cat <<'EOF'
 Usage: typos-skill.sh [options] [path...]
@@ -124,7 +126,7 @@ if [[ "$ACTION" == "apply-review" ]]; then
         exit 2
     fi
     require_python
-    "$PYTHON_BIN" scripts/apply-review.py "$REVIEW_FILE"
+    "$PYTHON_BIN" "$SCRIPT_DIR/scripts/apply-review.py" "$REVIEW_FILE"
     exit 0
 fi
 
@@ -212,6 +214,7 @@ print(f"Found {count} spelling errors in {len(files)} files.")
 print("")
 
 review_handle = open(review_path, "w", encoding="utf-8") if review_path else None
+occurrence_counts = {}
 try:
     with open(path, "r", encoding="utf-8") as handle:
         for item in iter_items(handle):
@@ -220,6 +223,9 @@ try:
             typo = item.get("typo", "")
             corrections = item.get("corrections", []) or []
             suggestion_text = ", ".join(corrections)
+            key = (file_path, line_num, typo)
+            occurrence_index = occurrence_counts.get(key, 0) + 1
+            occurrence_counts[key] = occurrence_index
 
             print(f"### `{file_path}`:{line_num}")
             print(f"  **Error**: `{typo}`")
@@ -231,6 +237,7 @@ try:
                     "path": file_path,
                     "line_num": item.get("line_num"),
                     "byte_offset": item.get("byte_offset"),
+                    "occurrence_index": occurrence_index,
                     "typo": typo,
                     "corrections": corrections,
                     "status": "PENDING",
@@ -260,6 +267,7 @@ echo "1. Run with --export-review to create a review file"
 echo "2. Update each JSON line with:"
 echo "   - status: ACCEPT CORRECT | FALSE POSITIVE | CUSTOM"
 echo "   - correction: required when status is CUSTOM"
+echo "   - keep byte_offset / occurrence_index unchanged for accurate apply"
 echo "3. Apply with --apply-review <file>"
 echo ""
 echo "Next steps:"
