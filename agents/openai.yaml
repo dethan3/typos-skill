@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typos Spell Review"
+  short_description: "Review typos fixes before applying"
+  default_prompt: "Use $typos to scan this repo, export a review file, and apply only approved spelling fixes."
