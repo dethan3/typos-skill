@@ -171,8 +171,9 @@ if [[ "$ACTION" == "apply-all" ]]; then
     exit $?
 fi
 
-TYPOS_OUTPUT_FILE=$(mktemp /tmp/typos-skill.XXXXXX.jsonl)
-TYPOS_ERROR_FILE=$(mktemp /tmp/typos-skill.XXXXXX.err)
+TMP_BASE_DIR="${TMPDIR:-/tmp}"
+TYPOS_OUTPUT_FILE=$(mktemp "${TMP_BASE_DIR}/typos-skill-output.XXXXXX")
+TYPOS_ERROR_FILE=$(mktemp "${TMP_BASE_DIR}/typos-skill-error.XXXXXX")
 cleanup() {
     rm -f "$TYPOS_OUTPUT_FILE" "$TYPOS_ERROR_FILE"
 }
