@@ -18,12 +18,29 @@ def normalize_status(value):
     return " ".join(text.split()).upper()
 
 
-def parse_int(value):
+def parse_optional_int(value):
+    if value is None:
+        return None, True
+    if isinstance(value, bool):
+        return None, False
     if isinstance(value, int):
-        return value
-    if isinstance(value, str) and value.isdigit():
-        return int(value)
-    return None
+        return value, True
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdigit():
+            return int(text), True
+    return None, False
+
+
+def parse_corrections(value):
+    if value is None:
+        return [], True
+    if not isinstance(value, list):
+        return [], False
+    for item in value:
+        if not isinstance(item, str) or not item:
+            return [], False
+    return value, True
 
 
 def resolve_target_path(review_path, target):
@@ -102,24 +119,45 @@ def load_review(path):
 
             file_path = item.get("path")
             typo = item.get("typo")
-            if not file_path or not typo:
+            if not isinstance(file_path, str) or not file_path.strip():
+                errors.append(f"{path}:{idx}: missing or invalid path")
+                continue
+            if not isinstance(typo, str) or not typo:
                 errors.append(f"{path}:{idx}: missing path or typo")
                 continue
             resolved_path = resolve_target_path(path, file_path)
 
-            corrections = item.get("corrections") or []
+            corrections, corrections_ok = parse_corrections(item.get("corrections"))
+            if not corrections_ok:
+                errors.append(f"{path}:{idx}: corrections must be a list of non-empty strings")
+                continue
+
             custom = item.get("correction")
-            line_num = parse_int(item.get("line_num"))
-            byte_offset = parse_int(item.get("byte_offset"))
-            occurrence_index = parse_int(item.get("occurrence_index"))
+            if custom is None:
+                custom = ""
+            elif not isinstance(custom, str):
+                errors.append(f"{path}:{idx}: correction must be a string")
+                continue
+
+            line_num, line_num_ok = parse_optional_int(item.get("line_num"))
+            byte_offset, byte_offset_ok = parse_optional_int(item.get("byte_offset"))
+            occurrence_index, occurrence_index_ok = parse_optional_int(item.get("occurrence_index"))
+            if not line_num_ok:
+                errors.append(f"{path}:{idx}: line_num must be an integer")
+            if not byte_offset_ok:
+                errors.append(f"{path}:{idx}: byte_offset must be an integer")
+            if not occurrence_index_ok:
+                errors.append(f"{path}:{idx}: occurrence_index must be an integer")
+            if not line_num_ok or not byte_offset_ok or not occurrence_index_ok:
+                continue
 
             if status == "CUSTOM":
-                if not custom:
+                if not custom.strip():
                     errors.append(f"{path}:{idx}: CUSTOM requires correction")
                     continue
                 correction = custom
             else:
-                if custom:
+                if custom.strip():
                     correction = custom
                 elif corrections:
                     correction = corrections[0]

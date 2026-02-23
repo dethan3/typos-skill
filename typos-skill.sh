@@ -20,14 +20,27 @@ Options:
 Notes:
   - Default path is current directory.
   - Review output is intended for LLM confirmation before applying changes.
+  - --diff, --apply-review, and --apply-all are mutually exclusive.
+  - --export-review is only available in default review mode.
 EOF
 }
 
 ACTION="review"
+ACTION_EXPLICIT=0
 PATHS=()
 EXPORT_REVIEW_FILE=""
 REVIEW_FILE=""
 PYTHON_BIN=""
+
+set_action() {
+    local requested="$1"
+    if [[ "$ACTION_EXPLICIT" -eq 1 && "$ACTION" != "$requested" ]]; then
+        echo "Error: --diff, --apply-review, and --apply-all are mutually exclusive." >&2
+        exit 2
+    fi
+    ACTION="$requested"
+    ACTION_EXPLICIT=1
+}
 
 require_python() {
     if [[ -n "$PYTHON_BIN" ]]; then
@@ -61,7 +74,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --diff)
-            ACTION="diff"
+            set_action "diff"
             shift
             ;;
         --apply-review)
@@ -70,7 +83,7 @@ while [[ $# -gt 0 ]]; do
                 usage >&2
                 exit 2
             fi
-            ACTION="apply-review"
+            set_action "apply-review"
             REVIEW_FILE="$2"
             shift 2
             ;;
@@ -84,7 +97,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --apply-all)
-            ACTION="apply-all"
+            set_action "apply-all"
             shift
             ;;
         --apply)
@@ -111,8 +124,8 @@ if [[ $# -gt 0 ]]; then
     PATHS+=("$@")
 fi
 
-if [[ -n "$EXPORT_REVIEW_FILE" && "$ACTION" == "apply-review" ]]; then
-    echo "Error: --export-review cannot be used with --apply-review." >&2
+if [[ -n "$EXPORT_REVIEW_FILE" && "$ACTION" != "review" ]]; then
+    echo "Error: --export-review can only be used in review mode." >&2
     exit 2
 fi
 
@@ -142,6 +155,20 @@ require_python
 if ! command -v typos >/dev/null 2>&1; then
     echo "Error: typos CLI not found. Install with: cargo install typos-cli" >&2
     exit 127
+fi
+
+if [[ "$ACTION" == "diff" ]]; then
+    echo ""
+    echo "Showing diff of proposed changes:"
+    typos --diff "${PATHS[@]}"
+    exit $?
+fi
+
+if [[ "$ACTION" == "apply-all" ]]; then
+    echo ""
+    echo "Applying all typos corrections (no LLM filtering)..."
+    typos --write-changes "${PATHS[@]}"
+    exit $?
 fi
 
 TYPOS_OUTPUT_FILE=$(mktemp /tmp/typos-skill.XXXXXX.jsonl)
@@ -278,18 +305,3 @@ else
 fi
 echo "  - Preview all:   ./typos-skill.sh --diff ${PATHS_DISPLAY}"
 echo "  - Apply all:     ./typos-skill.sh --apply-all ${PATHS_DISPLAY}"
-
-case "$ACTION" in
-    diff)
-        echo ""
-        echo "Showing diff of proposed changes:"
-        typos --diff "${PATHS[@]}"
-        ;;
-    apply-all)
-        echo ""
-        echo "Applying all typos corrections (no LLM filtering)..."
-        typos --write-changes "${PATHS[@]}"
-        ;;
-    review)
-        ;;
-esac
