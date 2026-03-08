@@ -3,7 +3,9 @@
 
 from pathlib import Path
 import json
+import os
 import sys
+import tempfile
 
 
 def die(message):
@@ -93,100 +95,101 @@ def load_review(path):
     skipped = 0
     errors = []
 
-    with path.open("r", encoding="utf-8") as handle:
-        for idx, raw in enumerate(handle, 1):
-            line = raw.strip()
-            if not line:
-                continue
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError as exc:
-                errors.append(f"{path}:{idx}: invalid JSON: {exc}")
-                continue
-
-            status = normalize_status(item.get("status"))
-            if not status:
-                errors.append(f"{path}:{idx}: missing status")
-                continue
-
-            if status in {"FALSE POSITIVE", "FALSE POSITIVE?", "FALSEPOSITIVE", "SKIP", "REJECT"}:
-                skipped += 1
-                continue
-
-            if status not in {"ACCEPT", "ACCEPT CORRECT", "CUSTOM"}:
-                errors.append(f"{path}:{idx}: unsupported status: {item.get('status')}")
-                continue
-
-            file_path = item.get("path")
-            typo = item.get("typo")
-            if not isinstance(file_path, str) or not file_path.strip():
-                errors.append(f"{path}:{idx}: missing or invalid path")
-                continue
-            if not isinstance(typo, str) or not typo:
-                errors.append(f"{path}:{idx}: missing path or typo")
-                continue
-            resolved_path = resolve_target_path(path, file_path)
-
-            corrections, corrections_ok = parse_corrections(item.get("corrections"))
-            if not corrections_ok:
-                errors.append(f"{path}:{idx}: corrections must be a list of non-empty strings")
-                continue
-
-            custom = item.get("correction")
-            if custom is None:
-                custom = ""
-            elif not isinstance(custom, str):
-                errors.append(f"{path}:{idx}: correction must be a string")
-                continue
-
-            line_num, line_num_ok = parse_optional_int(item.get("line_num"))
-            byte_offset, byte_offset_ok = parse_optional_int(item.get("byte_offset"))
-            occurrence_index, occurrence_index_ok = parse_optional_int(item.get("occurrence_index"))
-            if not line_num_ok:
-                errors.append(f"{path}:{idx}: line_num must be an integer")
-            if not byte_offset_ok:
-                errors.append(f"{path}:{idx}: byte_offset must be an integer")
-            if not occurrence_index_ok:
-                errors.append(f"{path}:{idx}: occurrence_index must be an integer")
-            if not line_num_ok or not byte_offset_ok or not occurrence_index_ok:
-                continue
-
-            if status == "CUSTOM":
-                if not custom.strip():
-                    errors.append(f"{path}:{idx}: CUSTOM requires correction")
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for idx, raw in enumerate(handle, 1):
+                line = raw.strip()
+                if not line:
                     continue
-                correction = custom
-            else:
-                if custom.strip():
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    errors.append(f"{path}:{idx}: invalid JSON: {exc}")
+                    continue
+
+                status = normalize_status(item.get("status"))
+                if not status:
+                    errors.append(f"{path}:{idx}: missing status")
+                    continue
+
+                if status in {"FALSE POSITIVE", "FALSE POSITIVE?", "FALSEPOSITIVE", "SKIP", "REJECT"}:
+                    skipped += 1
+                    continue
+
+                if status not in {"ACCEPT", "ACCEPT CORRECT", "CUSTOM"}:
+                    errors.append(f"{path}:{idx}: unsupported status: {item.get('status')}")
+                    continue
+
+                file_path = item.get("path")
+                typo = item.get("typo")
+                if not isinstance(file_path, str) or not file_path.strip():
+                    errors.append(f"{path}:{idx}: missing or invalid path")
+                    continue
+                if not isinstance(typo, str) or not typo:
+                    errors.append(f"{path}:{idx}: missing path or typo")
+                    continue
+                resolved_path = resolve_target_path(path, file_path)
+
+                corrections, corrections_ok = parse_corrections(item.get("corrections"))
+                if not corrections_ok:
+                    errors.append(f"{path}:{idx}: corrections must be a list of non-empty strings")
+                    continue
+
+                custom = item.get("correction")
+                if custom is None:
+                    custom = ""
+                elif not isinstance(custom, str):
+                    errors.append(f"{path}:{idx}: correction must be a string")
+                    continue
+
+                line_num, line_num_ok = parse_optional_int(item.get("line_num"))
+                byte_offset, byte_offset_ok = parse_optional_int(item.get("byte_offset"))
+                occurrence_index, occurrence_index_ok = parse_optional_int(item.get("occurrence_index"))
+                if not line_num_ok:
+                    errors.append(f"{path}:{idx}: line_num must be an integer")
+                if not byte_offset_ok:
+                    errors.append(f"{path}:{idx}: byte_offset must be an integer")
+                if not occurrence_index_ok:
+                    errors.append(f"{path}:{idx}: occurrence_index must be an integer")
+                if not line_num_ok or not byte_offset_ok or not occurrence_index_ok:
+                    continue
+
+                if status == "CUSTOM":
+                    if not custom.strip():
+                        errors.append(f"{path}:{idx}: CUSTOM requires correction")
+                        continue
                     correction = custom
-                elif corrections:
-                    correction = corrections[0]
                 else:
-                    errors.append(f"{path}:{idx}: no correction available")
+                    if custom.strip():
+                        correction = custom
+                    elif corrections:
+                        correction = corrections[0]
+                    else:
+                        errors.append(f"{path}:{idx}: no correction available")
+                        continue
+
+                if byte_offset is None and line_num is None:
+                    errors.append(f"{path}:{idx}: missing locator; provide byte_offset or line_num")
+                    continue
+                if occurrence_index is not None and occurrence_index < 1:
+                    errors.append(f"{path}:{idx}: occurrence_index must be >= 1")
                     continue
 
-            if byte_offset is None and line_num is None:
-                errors.append(f"{path}:{idx}: missing locator; provide byte_offset or line_num")
-                continue
-            if occurrence_index is not None and occurrence_index < 1:
-                errors.append(f"{path}:{idx}: occurrence_index must be >= 1")
-                continue
-
-            accepted.append(
-                {
-                    "path": resolved_path,
-                    "typo": typo,
-                    "correction": correction,
-                    "line_num": line_num,
-                    "byte_offset": byte_offset,
-                    "occurrence_index": occurrence_index,
-                }
-            )
+                accepted.append(
+                    {
+                        "path": resolved_path,
+                        "typo": typo,
+                        "correction": correction,
+                        "line_num": line_num,
+                        "byte_offset": byte_offset,
+                        "occurrence_index": occurrence_index,
+                    }
+                )
+    except OSError as exc:
+        die(f"cannot read review file '{path}': {exc}")
 
     if errors:
-        for error in errors:
-            print(error, file=sys.stderr)
-        sys.exit(1)
+        die("\n".join(errors))
 
     return accepted, skipped
 
@@ -200,7 +203,11 @@ def build_plan(changes):
         if not file_path.is_file():
             errors.append(f"Missing file: {path}")
             continue
-        data = file_path.read_bytes()
+        try:
+            data = file_path.read_bytes()
+        except OSError as exc:
+            errors.append(f"{path}: unable to read file: {exc}")
+            continue
         replacements = []
 
         for item in items:
@@ -255,18 +262,73 @@ def build_plan(changes):
         plans[path] = (data, replacements)
 
     if errors:
-        for error in errors:
-            print(error, file=sys.stderr)
-        sys.exit(1)
+        die("\n".join(errors))
 
     return plans
 
 
 def apply_plan(plans):
+    staged_paths = {}
+
     for path, (data, replacements) in plans.items():
+        updated = data
         for offset, length, correction in replacements:
-            data = data[:offset] + correction + data[offset + length:]
-        Path(path).write_bytes(data)
+            updated = updated[:offset] + correction + updated[offset + length:]
+
+        target = Path(path)
+        tmp_file = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                delete=False,
+                dir=target.parent,
+                prefix=f".{target.name}.typos-skill-",
+                suffix=".tmp",
+            ) as handle:
+                handle.write(updated)
+                tmp_file = Path(handle.name)
+        except OSError as exc:
+            if tmp_file is not None:
+                try:
+                    tmp_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            for staged in staged_paths.values():
+                try:
+                    staged.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            die(f"{path}: failed to stage updated file: {exc}")
+
+        staged_paths[path] = tmp_file
+
+    committed = []
+    try:
+        for path, tmp_file in staged_paths.items():
+            os.replace(tmp_file, path)
+            committed.append(path)
+    except OSError as exc:
+        rollback_errors = []
+
+        for path in reversed(committed):
+            original_data, _ = plans[path]
+            try:
+                Path(path).write_bytes(original_data)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"{path}: rollback failed: {rollback_exc}")
+
+        for path, tmp_file in staged_paths.items():
+            if path in committed:
+                continue
+            try:
+                tmp_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        detail = f"failed to commit staged changes: {exc}"
+        if rollback_errors:
+            detail = f"{detail}; rollback errors: {'; '.join(rollback_errors)}"
+        die(detail)
 
 
 def main():
