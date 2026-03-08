@@ -21,9 +21,9 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 1. Install `typos` CLI:
    ```bash
    cargo install typos-cli
-   # or using package manager
+   # or using package manager (if available)
    # brew install typos-cli (macOS)
-   # apt install typos-cli (Debian/Ubuntu, if packaged)
+   # Debian/Ubuntu: use `cargo install typos-cli`
    ```
 
 2. Install Python 3.8+ (required for review processing)
@@ -144,30 +144,50 @@ api = "api"
 cli = "cli"
 ```
 
-## 🔧 Integration with OpenClaw
+## 🔧 Integration with Claude Code and Codex
 
-### As an OpenClaw Skill
+### Install in Claude Code
 
-1. Copy the skill to your OpenClaw skills directory:
+1. Copy this repository to your Claude skills directory:
    ```bash
-   cp -r typos-skill ~/.openclaw/workspace/agent/skills/
+   mkdir -p ~/.claude/skills
+   cp -r /path/to/typos-skill ~/.claude/skills/typos
    ```
 
-2. The skill will be automatically available in OpenClaw
+2. Start a new Claude Code session in your target project.
 
-### Using with AI Assistants
+3. Ask Claude to use this skill explicitly, for example:
+   ```text
+   Use the typos skill to scan this repo, export review.jsonl, and apply only approved fixes.
+   ```
+
+### Install in Codex
+
+1. Copy this repository to your Codex skills directory:
+   ```bash
+   mkdir -p ~/.codex/skills
+   cp -r /path/to/typos-skill ~/.codex/skills/typos
+   ```
+
+2. Ensure scripts are executable:
+   ```bash
+   chmod +x ~/.codex/skills/typos/typos-skill.sh
+   chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+   ```
+
+3. Start a new Codex session in your target project and ask to use the skill:
+   ```text
+   Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
+   ```
+
+### Skill Workflow Prompt (Both)
 
 ```text
-Ask your AI assistant:
-Check spelling in the documentation directory
+Use the typos skill to:
+1) run --export-review review.jsonl on docs/ and README.md
+2) mark each finding as ACCEPT / FALSE POSITIVE / CUSTOM
+3) apply with --apply-review review.jsonl
 ```
-
-```bash
-# The assistant will run:
-./typos-skill.sh --export-review review.jsonl docs/
-```
-
-Then review and apply corrections.
 
 ## 🛠️ Development
 
