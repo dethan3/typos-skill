@@ -23,7 +23,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
    cargo install typos-cli
    # or using package manager
    # brew install typos-cli (macOS)
-   # apt install typos (Debian/Ubuntu)
+   # apt install typos-cli (Debian/Ubuntu, if packaged)
    ```
 
 2. Install Python 3.8+ (required for review processing)
@@ -85,8 +85,8 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 # Apply all suggestions without review (use with caution!)
 ./typos-skill.sh --apply-all
 
-# Check specific file types
-./typos-skill.sh --export-review review.jsonl "*.md" "*.txt"
+# Check selected paths explicitly
+./typos-skill.sh --export-review review.jsonl docs/ README.md
 ```
 
 ## 📋 Review File Format
@@ -98,7 +98,7 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
   "path": "relative/path/to/file",
   "line_num": 42,
   "byte_offset": 123,
-  "occurrence_index": 0,
+  "occurrence_index": 1,
   "typo": "recieve",
   "corrections": ["receive"],
   "status": "PENDING",
@@ -110,6 +110,7 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
 
 | Status | Description | Action |
 |--------|-------------|--------|
+| `PENDING` | Initial exported state before review | ⏳ Review required |
 | `ACCEPT` or `ACCEPT CORRECT` | Apply the suggested correction | ✅ Apply |
 | `FALSE POSITIVE` | Mark as false positive | ❌ Skip |
 | `FALSE POSITIVE?` | Uncertain false positive | ⚠️ Skip with note |
@@ -123,15 +124,12 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
 Create a `.typos.toml` file in your project root to customize spell checking:
 
 ```toml
-[default]
-extend-ignore-files = [
+[files]
+extend-exclude = [
   "*.min.js",
   "vendor/*",
   "node_modules/*"
 ]
-
-[files]
-# File-specific configurations
 ```
 
 ### Common Typos Rules
@@ -139,13 +137,11 @@ extend-ignore-files = [
 You can add custom dictionaries or ignore patterns:
 
 ```toml
-[default]
-extend-ignore-words = [
-  "npm",
-  "github",
-  "api",
-  "cli"
-]
+[default.extend-words]
+npm = "npm"
+github = "github"
+api = "api"
+cli = "cli"
 ```
 
 ## 🔧 Integration with OpenClaw
@@ -161,30 +157,32 @@ extend-ignore-words = [
 
 ### Using with AI Assistants
 
-```bash
-# Ask your AI assistant to check spelling
-"Check spelling in the documentation directory"
+```text
+Ask your AI assistant:
+Check spelling in the documentation directory
+```
 
+```bash
 # The assistant will run:
 ./typos-skill.sh --export-review review.jsonl docs/
-
-# Then review and apply corrections
 ```
+
+Then review and apply corrections.
 
 ## 🛠️ Development
 
 ### Project Structure
 
-```
+```text
 typos-skill/
 ├── SKILL.md              # Skill documentation
-├── skill.json           # Skill metadata
-├── typos-skill.sh       # Main script
+├── skill.json             # Skill metadata
+├── typos-skill.sh         # Main script
 ├── scripts/
-│   ├── apply-review.py  # Review application logic
+│   ├── apply-review.py    # Review application logic
 │   └── smoke-typos-skill.sh  # Test script
-├── agents/              # Agent configurations
-└── .typos.toml         # Default typos configuration
+├── agents/                # Agent configurations
+└── .typos.toml            # Default typos configuration
 ```
 
 ### Running Tests
