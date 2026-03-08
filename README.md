@@ -19,6 +19,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 ### Prerequisites
 
 1. Install `typos` CLI:
+
    ```bash
    cargo install typos-cli
    # or using package manager (if available)
@@ -31,6 +32,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 ### Installation
 
 1. Clone this repository:
+
    ```bash
    git clone https://github.com/luojiyin1987/typos-skill.git
    cd typos-skill
@@ -59,6 +61,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 ### Review and Apply Corrections
 
 1. **Export review file**:
+
    ```bash
    ./typos-skill.sh --export-review review.jsonl [path...]
    ```
@@ -108,14 +111,14 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
 
 ### Status Values
 
-| Status | Description | Action |
-|--------|-------------|--------|
-| `PENDING` | Initial exported state before review | ⏳ Review required |
-| `ACCEPT` or `ACCEPT CORRECT` | Apply the suggested correction | ✅ Apply |
-| `FALSE POSITIVE` | Mark as false positive | ❌ Skip |
-| `FALSE POSITIVE?` | Uncertain false positive | ⚠️ Skip with note |
-| `SKIP` or `REJECT` | Skip this correction | ❌ Skip |
-| `CUSTOM` | Apply custom correction | ✏️ Use `correction` field |
+| Status                       | Description                          | Action                    |
+| ---------------------------- | ------------------------------------ | ------------------------- |
+| `PENDING`                    | Initial exported state before review | ⏳ Review required        |
+| `ACCEPT` or `ACCEPT CORRECT` | Apply the suggested correction       | ✅ Apply                  |
+| `FALSE POSITIVE`             | Mark as false positive               | ❌ Skip                   |
+| `FALSE POSITIVE?`            | Uncertain false positive             | ⚠️ Skip with note         |
+| `SKIP` or `REJECT`           | Skip this correction                 | ❌ Skip                   |
+| `CUSTOM`                     | Apply custom correction              | ✏️ Use `correction` field |
 
 ## ⚙️ Configuration
 
@@ -149,6 +152,7 @@ cli = "cli"
 ### Install in Claude Code
 
 1. Copy this repository to your Claude skills directory:
+
    ```bash
    mkdir -p ~/.claude/skills
    cp -r /path/to/typos-skill ~/.claude/skills/typos
@@ -164,12 +168,14 @@ cli = "cli"
 ### Install in Codex
 
 1. Copy this repository to your Codex skills directory:
+
    ```bash
    mkdir -p ~/.codex/skills
    cp -r /path/to/typos-skill ~/.codex/skills/typos
    ```
 
 2. Ensure scripts are executable:
+
    ```bash
    chmod +x ~/.codex/skills/typos/typos-skill.sh
    chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
