@@ -39,6 +39,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
    ```
 
 2. Make the script executable:
+
    ```bash
    chmod +x typos-skill.sh
    ```
@@ -75,6 +76,7 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
    - Do not modify `byte_offset`, `occurrence_index`, or `line_num` unless you know what you're doing
 
 3. **Apply approved changes**:
+
    ```bash
    ./typos-skill.sh --apply-review review.jsonl
    ```
@@ -161,6 +163,7 @@ cli = "cli"
 2. Start a new Claude Code session in your target project.
 
 3. Ask Claude to use this skill explicitly, for example:
+
    ```text
    Use the typos skill to scan this repo, export review.jsonl, and apply only approved fixes.
    ```
@@ -182,6 +185,7 @@ cli = "cli"
    ```
 
 3. Start a new Codex session in your target project and ask to use the skill:
+
    ```text
    Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
    ```
@@ -248,4 +252,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ for the OpenClaw community**
+Made with care for the OpenClaw community.
