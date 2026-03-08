@@ -241,7 +241,13 @@ with open(path, "r", encoding="utf-8") as handle:
 print(f"Found {count} spelling errors in {len(files)} files.")
 print("")
 
-review_handle = open(review_path, "w", encoding="utf-8") if review_path else None
+review_handle = None
+if review_path:
+    try:
+        review_handle = open(review_path, "w", encoding="utf-8")
+    except OSError as exc:
+        print(f"Error: cannot write review file '{review_path}': {exc}", file=sys.stderr)
+        sys.exit(1)
 occurrence_counts = {}
 try:
     with open(path, "r", encoding="utf-8") as handle:
@@ -271,10 +277,21 @@ try:
                     "status": "PENDING",
                     "correction": ""
                 }
-                review_handle.write(json.dumps(review_item, ensure_ascii=True) + "\n")
+                try:
+                    review_handle.write(json.dumps(review_item, ensure_ascii=True) + "\n")
+                except OSError as exc:
+                    print(
+                        f"Error: failed writing review file '{review_path}': {exc}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
 finally:
     if review_handle:
-        review_handle.close()
+        try:
+            review_handle.close()
+        except OSError as exc:
+            print(f"Error: failed closing review file '{review_path}': {exc}", file=sys.stderr)
+            sys.exit(1)
 
 if review_path:
     print(f"Review file written to: {review_path}")
