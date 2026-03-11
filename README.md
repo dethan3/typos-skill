@@ -170,11 +170,13 @@ cli = "cli"
 
 ### Install in Codex
 
-1. Copy this repository to your Codex skills directory:
+1. Recommended: install directly from GitHub with Codex's built-in `skill-installer` helper:
 
    ```bash
-   mkdir -p ~/.codex/skills
-   cp -r /path/to/typos-skill ~/.codex/skills/typos
+   python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+     --url https://github.com/luojiyin1987/typos-skill \
+     --path . \
+     --name typos
    ```
 
 2. Ensure scripts are executable:
@@ -184,11 +186,49 @@ cli = "cli"
    chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
    ```
 
-3. Start a new Codex session in your target project and ask to use the skill:
+3. If you do not have the installer helper available, use the manual fallback:
+
+   ```bash
+   mkdir -p ~/.codex/skills
+   cp -r /path/to/typos-skill ~/.codex/skills/typos
+   chmod +x ~/.codex/skills/typos/typos-skill.sh
+   chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+   ```
+
+4. Start a new Codex session in your target project and ask to use the skill:
 
    ```text
    Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
    ```
+
+### Using `typos` in Codex
+
+After installation, start a fresh Codex session in the target repository and invoke the skill explicitly with `$typos` or `typos`.
+
+Common Codex prompts:
+
+```text
+Use $typos to scan this repository and summarize the spelling issues before changing anything.
+```
+
+```text
+Use $typos to run --export-review review.jsonl on src/ and docs/, review each finding, then apply only ACCEPT and CUSTOM fixes.
+```
+
+```text
+Use $typos to check README.md and docs/, mark false positives, and show me the diff before applying changes.
+```
+
+```text
+Use $typos to run --apply-all on docs/ only. Avoid touching code files.
+```
+
+Typical Codex workflow:
+
+1. Export suggestions with `--export-review review.jsonl`.
+2. Review each item as `ACCEPT`, `FALSE POSITIVE`, or `CUSTOM`.
+3. Apply approved fixes with `--apply-review review.jsonl`.
+4. Re-run the skill if files changed during review to avoid offset conflicts.
 
 ### Skill Workflow Prompt (Both)
 
