@@ -170,36 +170,42 @@ cli = "cli"
 
 ### Install in Codex
 
-1. Recommended: install directly from GitHub with Codex's built-in `skill-installer` helper:
+Choose one of the installation methods below.
 
-   ```bash
-   python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
-     --url https://github.com/luojiyin1987/typos-skill \
-     --path . \
-     --name typos
-   ```
+#### Recommended Method
 
-2. Ensure scripts are executable:
+Install directly from GitHub with Codex's built-in `skill-installer` helper:
 
-   ```bash
-   chmod +x ~/.codex/skills/typos/typos-skill.sh
-   chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
-   ```
+```bash
+python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+  --url https://github.com/luojiyin1987/typos-skill \
+  --path . \
+  --name typos
+```
 
-3. If you do not have the installer helper available, use the manual fallback:
+Then ensure the scripts are executable:
 
-   ```bash
-   mkdir -p ~/.codex/skills
-   cp -r /path/to/typos-skill ~/.codex/skills/typos
-   chmod +x ~/.codex/skills/typos/typos-skill.sh
-   chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
-   ```
+```bash
+chmod +x ~/.codex/skills/typos/typos-skill.sh
+chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+```
 
-4. Start a new Codex session in your target project and ask to use the skill:
+#### Manual Fallback Method
 
-   ```text
-   Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
-   ```
+If the installer helper is unavailable, copy the skill into `~/.codex/skills` manually:
+
+```bash
+mkdir -p ~/.codex/skills
+cp -r /path/to/typos-skill ~/.codex/skills/typos
+chmod +x ~/.codex/skills/typos/typos-skill.sh
+chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+```
+
+After either installation method, start a new Codex session in your target project and ask to use the skill:
+
+```text
+Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
+```
 
 ### Using `typos` in Codex
 
