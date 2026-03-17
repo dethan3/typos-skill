@@ -174,16 +174,15 @@ Choose one of the installation methods below.
 
 #### Recommended Method
 
-Install directly from GitHub with Codex's built-in `skill-installer` helper:
+From a Codex session, ask the built-in `$skill-installer` system skill to
+install this repository as `typos`:
 
-```bash
-python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
-  --url https://github.com/luojiyin1987/typos-skill \
-  --path . \
-  --name typos
+```text
+Use $skill-installer to install the skill from https://github.com/luojiyin1987/typos-skill with path . and name typos.
 ```
 
-Then ensure the scripts are executable:
+Restart Codex after installation, then ensure the scripts are executable if
+your environment does not preserve executable bits:
 
 ```bash
 chmod +x ~/.codex/skills/typos/typos-skill.sh
