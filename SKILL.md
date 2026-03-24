@@ -10,12 +10,14 @@ Use this skill when the user wants to scan files for spelling errors with the
 
 ## Workflow
 
-1. Run `./typos-skill.sh --export-review review.jsonl [path...]` to generate a
-   review file plus a human-readable summary.
+1. Resolve the absolute path to `typos-skill.sh` in the installed skill
+   directory, then run `<skill-dir>/typos-skill.sh --export-review review.jsonl
+   [path...]` to generate a review file plus a human-readable summary.
 2. Read file context at the reported path and line; update each JSON line:
    - `status`: `ACCEPT CORRECT`, `FALSE POSITIVE`, or `CUSTOM`
    - `correction`: required when status is `CUSTOM`
-3. Apply approved changes with `./typos-skill.sh --apply-review review.jsonl`.
+3. Apply approved changes with `<skill-dir>/typos-skill.sh --apply-review
+   review.jsonl`.
 4. Optional: use `--diff` to preview or `--apply-all` to skip review.
 
 ## Review File Rules
@@ -34,11 +36,14 @@ Use this skill when the user wants to scan files for spelling errors with the
 
 ## Execution Context
 
+- Do not assume the current working directory is the skill directory.
+- Invoke `typos-skill.sh` via its absolute path from the installed skill
+  directory.
+- For user-installed Codex skills, that path is typically
+  `${CODEX_HOME:-$HOME/.codex}/skills/typos/typos-skill.sh`.
 - The tool no longer requires running from repo root for `--apply-review`.
 - Relative `path` values in `review.jsonl` are resolved relative to the review
   file directory.
-- `./typos-skill.sh` still assumes you are in this skill directory; from
-  elsewhere, invoke via absolute path.
 
 ## Failure Scenarios and Conflict Handling
 

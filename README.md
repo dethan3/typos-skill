@@ -185,19 +185,22 @@ Restart Codex after installation, then ensure the scripts are executable if
 your environment does not preserve executable bits:
 
 ```bash
-chmod +x ~/.codex/skills/typos/typos-skill.sh
-chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/typos"
+chmod +x "$SKILL_HOME/typos-skill.sh"
+chmod +x "$SKILL_HOME/scripts/smoke-typos-skill.sh"
 ```
 
 #### Manual Fallback Method
 
-If the installer helper is unavailable, copy the skill into `~/.codex/skills` manually:
+If your Codex environment does not expose `$skill-installer`, copy the skill
+into the user skill directory manually:
 
 ```bash
-mkdir -p ~/.codex/skills
-cp -r /path/to/typos-skill ~/.codex/skills/typos
-chmod +x ~/.codex/skills/typos/typos-skill.sh
-chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
+SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+mkdir -p "$SKILLS_DIR"
+cp -r /path/to/typos-skill "$SKILLS_DIR/typos"
+chmod +x "$SKILLS_DIR/typos/typos-skill.sh"
+chmod +x "$SKILLS_DIR/typos/scripts/smoke-typos-skill.sh"
 ```
 
 After either installation method, start a new Codex session in your target project and ask to use the skill:
