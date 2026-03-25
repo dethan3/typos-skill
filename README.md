@@ -1,29 +1,25 @@
-# Typos Skill for Claude Code and Codex
+# Typos Skill - AI-Powered Spell Check with LLM Review
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://clawhub.com)
 
-Use the `typos` CLI to find spelling issues, export them into a review file,
-let an agent or LLM confirm each change, and apply only the approved fixes.
+A portable Skill for agent-assisted typo review. It uses the `typos` CLI to
+detect spelling issues, exports them into a review file, and applies only the
+fixes that were explicitly approved by an LLM or a human reviewer.
 
-## Who This Is For
+This Skill is commonly used with Claude Code and Codex, but the workflow is
+generic and can be adapted to other agent or review-driven environments.
 
-This repository is primarily packaged as a Skill for:
+## ✨ Features
 
-- Claude Code
-- Codex
+- Automatic spell checking powered by the `typos` CLI
+- Review-first workflow using a structured `review.jsonl` file
+- Approved-only apply flow instead of blind bulk replacement
+- Diff preview and `--apply-all` shortcuts when you want a faster path
+- Batch processing for multiple files and directories
+- Configurable rules through `.typos.toml`
 
-It wraps `typos` in a safer review workflow:
-
-1. scan files for spelling issues
-2. export a `review.jsonl` file
-3. review each item with an agent or manually
-4. apply only approved corrections
-
-If you only want raw spell checking, you can run `typos` directly. This Skill is
-useful when you want an agent-assisted review step before files are modified.
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -32,6 +28,23 @@ Install the required tools:
 ```bash
 cargo install typos-cli
 python3 --version
+```
+
+### Run Directly from This Repository
+
+If you want to use the script directly without installing it as a Skill:
+
+```bash
+git clone https://github.com/luojiyin1987/typos-skill.git
+cd typos-skill
+chmod +x typos-skill.sh
+chmod +x scripts/smoke-typos-skill.sh
+```
+
+Then run a basic review export:
+
+```bash
+./typos-skill.sh --export-review review.jsonl README.md
 ```
 
 ### Install in Claude Code
@@ -76,7 +89,7 @@ After installation, start a new Codex session in the target repository and use:
 Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
 ```
 
-## How It Works
+## 📖 How It Works
 
 The core workflow is always the same:
 
@@ -98,10 +111,10 @@ The core workflow is always the same:
    ```
 
 This repository does not automatically call an LLM. The Skill produces a
-reviewable file so Claude Code, Codex, or a human can make the final decision
-before edits are applied.
+reviewable file so Claude Code, Codex, another agent, or a human can make the
+final decision before edits are applied.
 
-## Agent Usage
+## 🤖 Using with Claude Code and Codex
 
 ### Claude Code Prompts
 
@@ -131,7 +144,7 @@ Use $typos to check README.md and docs/, mark false positives, and show me the d
 Use $typos to run --apply-all on docs/ only. Avoid touching code files.
 ```
 
-## CLI Reference
+## 🧰 CLI Reference
 
 ### Basic Usage
 
@@ -142,7 +155,7 @@ Use $typos to run --apply-all on docs/ only. Avoid touching code files.
 # Check specific files or directories
 ./typos-skill.sh src/ tests/ README.md
 
-# Export review for agent/LLM processing
+# Export review for agent or LLM processing
 ./typos-skill.sh --export-review review.jsonl src/
 ```
 
@@ -159,7 +172,7 @@ Use $typos to run --apply-all on docs/ only. Avoid touching code files.
 ./typos-skill.sh --apply-all [path...]
 ```
 
-## Review File Format
+## 📋 Review File Format
 
 The review file (`review.jsonl`) contains one JSON object per line:
 
@@ -198,7 +211,7 @@ Important rules:
 - `CUSTOM` requires a non-empty `correction`.
 - If files changed after export, re-run `--export-review` before applying.
 
-## Configuration
+## ⚙️ Configuration
 
 Create a `.typos.toml` file in your project root to customize spell checking:
 
@@ -221,7 +234,7 @@ api = "api"
 cli = "cli"
 ```
 
-## Development
+## 🛠 Development
 
 ### Project Structure
 
@@ -244,12 +257,21 @@ typos-skill/
 ./scripts/smoke-typos-skill.sh
 ```
 
-## Compatibility Note
+## 🤝 Contributing
 
-This repository is written as a portable agent skill workflow. The README is
-optimized for Claude Code and Codex because those are the primary usage paths
-documented here.
+Contributions are welcome.
 
-## License
+1. Fork the repository.
+2. Create a feature branch.
+3. Run the smoke test after your changes.
+4. Update documentation if behavior or workflow changed.
+5. Open a pull request with a clear summary.
+
+## 📞 Support
+
+- Issues: [GitHub Issues](https://github.com/luojiyin1987/typos-skill/issues)
+- Discussions: [GitHub Discussions](https://github.com/luojiyin1987/typos-skill/discussions)
+
+## 📄 License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
