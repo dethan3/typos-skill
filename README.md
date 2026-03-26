@@ -3,50 +3,150 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://clawhub.com)
 
-A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to detect spelling errors and provides LLM-assisted review before applying corrections.
+A portable Skill for agent-assisted typo review. It uses the `typos` CLI to
+detect spelling issues, exports them into a review file, and applies only the
+fixes that were explicitly approved by an LLM or a human reviewer.
+
+This Skill is commonly used with Claude Code and Codex, but the workflow is
+generic and can be adapted to other agent or review-driven environments.
 
 ## ✨ Features
 
-- 🔍 **Automatic spell checking** using the `typos` CLI tool
-- 🤖 **LLM-powered review** for intelligent correction approval
-- 📝 **Interactive workflow** with human-in-the-loop validation
-- 🔄 **Safe application** with preview and rollback options
-- 📁 **Batch processing** for multiple files and directories
-- ⚙️ **Customizable rules** via `.typos.toml` configuration
+- Automatic spell checking powered by the `typos` CLI
+- Review-first workflow using a structured `review.jsonl` file
+- Approved-only apply flow instead of blind bulk replacement
+- Diff preview and `--apply-all` shortcuts when you want a faster path
+- Batch processing for multiple files and directories
+- Configurable rules through `.typos.toml`
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-1. Install `typos` CLI:
+Install the required tools:
+
+```bash
+cargo install typos-cli
+python3 --version
+```
+
+### Run Directly from This Repository
+
+If you want to use the script directly without installing it as a Skill:
+
+```bash
+git clone https://github.com/luojiyin1987/typos-skill.git
+cd typos-skill
+chmod +x typos-skill.sh
+chmod +x scripts/smoke-typos-skill.sh
+```
+
+Then run a basic review export:
+
+```bash
+./typos-skill.sh --export-review review.jsonl README.md
+```
+
+### Install in Claude Code
+
+Copy this repository into your Claude skills directory:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -r /path/to/typos-skill ~/.claude/skills/typos
+chmod +x ~/.claude/skills/typos/typos-skill.sh
+chmod +x ~/.claude/skills/typos/scripts/smoke-typos-skill.sh
+```
+
+Start a new Claude Code session in the target repository, then invoke the skill
+explicitly:
+
+```text
+Use the typos skill to scan this repo, export review.jsonl, and apply only approved fixes.
+```
+
+### Install in Codex
+
+Recommended method, from a Codex session:
+
+```text
+Use $skill-installer to install the skill from https://github.com/luojiyin1987/typos-skill with path . and name typos.
+```
+
+If your environment does not expose `$skill-installer`, install manually:
+
+```bash
+SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+mkdir -p "$SKILLS_DIR"
+cp -r /path/to/typos-skill "$SKILLS_DIR/typos"
+chmod +x "$SKILLS_DIR/typos/typos-skill.sh"
+chmod +x "$SKILLS_DIR/typos/scripts/smoke-typos-skill.sh"
+```
+
+After installation, start a new Codex session in the target repository and use:
+
+```text
+Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
+```
+
+## 📖 How It Works
+
+The core workflow is always the same:
+
+1. Export suggestions:
 
    ```bash
-   cargo install typos-cli
-   # or using package manager (if available)
-   # brew install typos-cli (macOS)
-   # Debian/Ubuntu: use `cargo install typos-cli`
+   ./typos-skill.sh --export-review review.jsonl [path...]
    ```
 
-2. Install Python 3.8+ (required for review processing)
+2. Review each JSON line in `review.jsonl`:
+   - mark accepted items as `ACCEPT` or `ACCEPT CORRECT`
+   - mark false positives as `FALSE POSITIVE`
+   - use `CUSTOM` and set `correction` when you want your own replacement
 
-### Installation
-
-1. Clone this repository:
+3. Apply approved changes:
 
    ```bash
-   git clone https://github.com/luojiyin1987/typos-skill.git
-   cd typos-skill
+   ./typos-skill.sh --apply-review review.jsonl
    ```
 
-2. Make the script executable:
+This repository does not automatically call an LLM. The Skill produces a
+reviewable file so Claude Code, Codex, another agent, or a human can make the
+final decision before edits are applied.
 
-   ```bash
-   chmod +x typos-skill.sh
-   ```
+## 🤖 Using with Claude Code and Codex
 
-## 📖 Usage
+### Claude Code Prompts
 
-### Basic Spell Check with LLM Review
+```text
+Use the typos skill to scan this repository and summarize the spelling issues before changing anything.
+```
+
+```text
+Use the typos skill to run --export-review review.jsonl on docs/ and README.md, mark each finding as ACCEPT / FALSE POSITIVE / CUSTOM, then apply only approved fixes.
+```
+
+### Codex Prompts
+
+```text
+Use $typos to scan this repository and summarize the spelling issues before changing anything.
+```
+
+```text
+Use $typos to run --export-review review.jsonl on src/ and docs/, review each finding, then apply only ACCEPT and CUSTOM fixes.
+```
+
+```text
+Use $typos to check README.md and docs/, mark false positives, and show me the diff before applying changes.
+```
+
+```text
+Use $typos to run --apply-all on docs/ only. Avoid touching code files.
+```
+
+## 🧰 CLI Reference
+
+### Basic Usage
 
 ```bash
 # Check current directory
@@ -55,48 +155,26 @@ A powerful spell-checking skill for OpenClaw that uses the `typos` CLI tool to d
 # Check specific files or directories
 ./typos-skill.sh src/ tests/ README.md
 
-# Export review for LLM processing
+# Export review for agent or LLM processing
 ./typos-skill.sh --export-review review.jsonl src/
 ```
 
-### Review and Apply Corrections
-
-1. **Export review file**:
-
-   ```bash
-   ./typos-skill.sh --export-review review.jsonl [path...]
-   ```
-
-2. **Review with LLM**:
-   - Open `review.jsonl` and examine each suggested correction
-   - Update `status` field:
-     - `ACCEPT` or `ACCEPT CORRECT` - Apply the suggested correction
-     - `FALSE POSITIVE` - Skip this suggestion
-     - `CUSTOM` - Provide custom correction in `correction` field
-   - Do not modify `byte_offset`, `occurrence_index`, or `line_num` unless you know what you're doing
-
-3. **Apply approved changes**:
-
-   ```bash
-   ./typos-skill.sh --apply-review review.jsonl
-   ```
-
-### Advanced Options
+### Commands
 
 ```bash
-# Preview changes without applying
-./typos-skill.sh --diff
+# Preview all proposed changes without applying them
+./typos-skill.sh --diff [path...]
 
-# Apply all suggestions without review (use with caution!)
-./typos-skill.sh --apply-all
+# Apply only approved changes from a review file
+./typos-skill.sh --apply-review review.jsonl
 
-# Check selected paths explicitly
-./typos-skill.sh --export-review review.jsonl docs/ README.md
+# Apply all suggestions without review
+./typos-skill.sh --apply-all [path...]
 ```
 
 ## 📋 Review File Format
 
-The review file (`review.jsonl`) contains one JSON object per line with the following structure:
+The review file (`review.jsonl`) contains one JSON object per line:
 
 ```json
 {
@@ -104,8 +182,8 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
   "line_num": 42,
   "byte_offset": 123,
   "occurrence_index": 1,
-  "typo": "recieve",
-  "corrections": ["receive"],
+  "typo": "<detected-typo>",
+  "corrections": ["<suggested-correction>"],
   "status": "PENDING",
   "correction": ""
 }
@@ -113,18 +191,27 @@ The review file (`review.jsonl`) contains one JSON object per line with the foll
 
 ### Status Values
 
-| Status                       | Description                          | Action                    |
-| ---------------------------- | ------------------------------------ | ------------------------- |
-| `PENDING`                    | Initial exported state before review | ⏳ Review required        |
-| `ACCEPT` or `ACCEPT CORRECT` | Apply the suggested correction       | ✅ Apply                  |
-| `FALSE POSITIVE`             | Mark as false positive               | ❌ Skip                   |
-| `FALSE POSITIVE?`            | Uncertain false positive             | ⚠️ Skip with note         |
-| `SKIP` or `REJECT`           | Skip this correction                 | ❌ Skip                   |
-| `CUSTOM`                     | Apply custom correction              | ✏️ Use `correction` field |
+| Status | Meaning |
+| --- | --- |
+| `PENDING` | Initial exported state. Review required before apply. |
+| `ACCEPT` | Apply the suggested correction. |
+| `ACCEPT CORRECT` | Apply the suggested correction. |
+| `FALSE POSITIVE` | Skip this item. |
+| `FALSE POSITIVE?` | Skip this item. |
+| `SKIP` | Skip this item. |
+| `REJECT` | Skip this item. |
+| `CUSTOM` | Apply the value in `correction`. |
+
+Important rules:
+
+- `PENDING` cannot be applied directly. Change each item to a final review
+  status before running `--apply-review`.
+- Do not modify `byte_offset`, `occurrence_index`, or `line_num` unless you
+  understand how locator matching works.
+- `CUSTOM` requires a non-empty `correction`.
+- If files changed after export, re-run `--export-review` before applying.
 
 ## ⚙️ Configuration
-
-### `.typos.toml` Configuration
 
 Create a `.typos.toml` file in your project root to customize spell checking:
 
@@ -137,9 +224,7 @@ extend-exclude = [
 ]
 ```
 
-### Common Typos Rules
-
-You can add custom dictionaries or ignore patterns:
+You can also add project-specific words:
 
 ```toml
 [default.extend-words]
@@ -149,107 +234,44 @@ api = "api"
 cli = "cli"
 ```
 
-## 🔧 Integration with Claude Code and Codex
-
-### Install in Claude Code
-
-1. Copy this repository to your Claude skills directory:
-
-   ```bash
-   mkdir -p ~/.claude/skills
-   cp -r /path/to/typos-skill ~/.claude/skills/typos
-   ```
-
-2. Start a new Claude Code session in your target project.
-
-3. Ask Claude to use this skill explicitly, for example:
-
-   ```text
-   Use the typos skill to scan this repo, export review.jsonl, and apply only approved fixes.
-   ```
-
-### Install in Codex
-
-1. Copy this repository to your Codex skills directory:
-
-   ```bash
-   mkdir -p ~/.codex/skills
-   cp -r /path/to/typos-skill ~/.codex/skills/typos
-   ```
-
-2. Ensure scripts are executable:
-
-   ```bash
-   chmod +x ~/.codex/skills/typos/typos-skill.sh
-   chmod +x ~/.codex/skills/typos/scripts/smoke-typos-skill.sh
-   ```
-
-3. Start a new Codex session in your target project and ask to use the skill:
-
-   ```text
-   Use $typos to scan this repo, export review.jsonl, then apply approved corrections.
-   ```
-
-### Skill Workflow Prompt (Both)
-
-```text
-Use the typos skill to:
-1) run --export-review review.jsonl on docs/ and README.md
-2) mark each finding as ACCEPT / FALSE POSITIVE / CUSTOM
-3) apply with --apply-review review.jsonl
-```
-
-## 🛠️ Development
+## 🛠 Development
 
 ### Project Structure
 
 ```text
 typos-skill/
-├── SKILL.md              # Skill documentation
-├── skill.json             # Skill metadata
-├── typos-skill.sh         # Main script
+├── SKILL.md                     # Skill instructions for the agent
+├── skill.json                   # Skill metadata
+├── typos-skill.sh               # Main entry point
 ├── scripts/
-│   ├── apply-review.py    # Review application logic
-│   └── smoke-typos-skill.sh  # Test script
-├── agents/                # Agent configurations
-└── .typos.toml            # Default typos configuration
+│   ├── apply-review.py          # Applies approved fixes from review.jsonl
+│   └── smoke-typos-skill.sh     # Minimal smoke test
+├── agents/
+│   └── openai.yaml              # Agent UI metadata
+└── .typos.toml                  # Default repository typos configuration
 ```
 
-### Running Tests
+### Smoke Test
 
 ```bash
-# Run smoke test
 ./scripts/smoke-typos-skill.sh
-
-# Test with sample files
-./typos-skill.sh --diff test/
 ```
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [typos](https://github.com/crate-ci/typos) - The fantastic spell checker
-- [OpenClaw](https://github.com/openclaw/openclaw) - The AI agent platform
-- All contributors who help improve this skill
+1. Fork the repository.
+2. Create a feature branch.
+3. Run the smoke test after your changes.
+4. Update documentation if behavior or workflow changed.
+5. Open a pull request with a clear summary.
 
 ## 📞 Support
 
 - Issues: [GitHub Issues](https://github.com/luojiyin1987/typos-skill/issues)
 - Discussions: [GitHub Discussions](https://github.com/luojiyin1987/typos-skill/discussions)
 
----
+## 📄 License
 
-Made with care for the OpenClaw community.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

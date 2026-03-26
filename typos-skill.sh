@@ -5,6 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SELF_CMD=$(printf '%q' "$SCRIPT_DIR/typos-skill.sh")
 
 usage() {
     cat <<'EOF'
@@ -317,9 +318,9 @@ echo "3. Apply with --apply-review <file>"
 echo ""
 echo "Next steps:"
 if [[ -n "$EXPORT_REVIEW_FILE" ]]; then
-    echo "  - Apply approved: ./typos-skill.sh --apply-review $(printf '%q' "$EXPORT_REVIEW_FILE")"
+    echo "  - Apply approved: $SELF_CMD --apply-review $(printf '%q' "$EXPORT_REVIEW_FILE")"
 else
-    echo "  - Export review: ./typos-skill.sh --export-review review.jsonl ${PATHS_DISPLAY}"
+    echo "  - Export review: $SELF_CMD --export-review review.jsonl ${PATHS_DISPLAY}"
 fi
-echo "  - Preview all:   ./typos-skill.sh --diff ${PATHS_DISPLAY}"
-echo "  - Apply all:     ./typos-skill.sh --apply-all ${PATHS_DISPLAY}"
+echo "  - Preview all:   $SELF_CMD --diff ${PATHS_DISPLAY}"
+echo "  - Apply all:     $SELF_CMD --apply-all ${PATHS_DISPLAY}"
