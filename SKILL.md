@@ -23,6 +23,8 @@ to improvise basic false-positive rules.
    - `correction`: required when status is `CUSTOM`
    - `reason`: keep or refine the explanation for why the item should or
      should not be changed
+   - `rename_candidate`: when present, prefer a manual symbol rename over a
+     spelling replacement
 4. Prefer `.typos.toml` suggestions for repeated false positives before
    editing source one by one.
 5. Apply approved changes with `<skill-dir>/typos-skill.sh --apply-review
@@ -40,7 +42,10 @@ to improvise basic false-positive rules.
   - `bucket`: conservative triage bucket
   - `suggested_status`: default review decision
   - `preferred_action`: `REVIEW_SOURCE`, `KEEP_SOURCE`, or `UPDATE_TYPOS_TOML`
+    and `RENAME_SYMBOL` for short internal variables
   - `reason`: why the item is safe to change or should be skipped
+  - `rename_candidate`: suggested semantic variable rename, for example
+    `ot -> optionTexts`
   - `toml_section` / `toml_snippet`: suggested `.typos.toml` update when safer
     than editing source
 - Do not edit locator fields unless you know what you are doing:
