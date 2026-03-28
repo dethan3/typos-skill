@@ -1,4 +1,4 @@
 interface:
   display_name: "Typos Spell Review"
-  short_description: "Review typos fixes before applying"
-  default_prompt: "Use $typos to scan this repo, export a review file, and apply only approved spelling fixes."
+  short_description: "Conservative typo triage before applying fixes"
+  default_prompt: "Use $typos to scan this repo, export a review file with reasons and .typos.toml suggestions, then apply only approved spelling fixes."
