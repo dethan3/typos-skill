@@ -40,6 +40,7 @@ cleanup() {
 trap cleanup EXIT
 
 cat > "$TMP_DIR/sample.txt" <<'EOF'
+const ot = optionTexts
 thsi pn pn
 EOF
 
@@ -61,6 +62,11 @@ for item in items:
 assert any(item.get("preferred_action") == "UPDATE_TYPOS_TOML" for item in items), (
     "expected at least one .typos.toml suggestion"
 )
+assert any(
+    item.get("preferred_action") == "RENAME_SYMBOL"
+    and item.get("rename_candidate") == "optionTexts"
+    for item in items
+), "expected rename candidate suggestion"
 PY
 
 "$SKILL" "$ROOT_DIR" >/dev/null
