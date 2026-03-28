@@ -69,6 +69,41 @@ assert any(
 ), "expected rename candidate suggestion"
 PY
 
+mkdir -p "$TMP_DIR/docs"
+
+cat > "$TMP_DIR/negative.js" <<'EOF'
+if (ot == optionTexts) {}
+obj.ot = optionTexts
+EOF
+
+cat > "$TMP_DIR/docs/mockup-guide.md" <<'EOF'
+respones
+EOF
+
+cat > "$TMP_DIR/negative.jsonl" <<EOF
+{"type":"typo","path":"$TMP_DIR/negative.js","line_num":1,"byte_offset":4,"typo":"ot","corrections":["to"]}
+{"type":"typo","path":"$TMP_DIR/negative.js","line_num":2,"byte_offset":4,"typo":"ot","corrections":["to"]}
+{"type":"typo","path":"$TMP_DIR/docs/mockup-guide.md","line_num":1,"byte_offset":0,"typo":"respones","corrections":["response"]}
+EOF
+
+python3 "$ROOT_DIR/scripts/export-review.py" "$TMP_DIR/negative.jsonl" "$TMP_DIR/negative-review.jsonl" >/dev/null
+
+python3 - "$TMP_DIR/negative-review.jsonl" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    items = [json.loads(line) for line in handle if line.strip()]
+
+by_line = {item["line_num"]: item for item in items if item["path"].endswith("negative.js")}
+doc_item = next(item for item in items if item["path"].endswith("mockup-guide.md"))
+
+assert by_line[1]["preferred_action"] != "RENAME_SYMBOL", "comparison should not become rename advice"
+assert by_line[2]["bucket"] != "false_positive.css_class", "object property should not become CSS class"
+assert doc_item["bucket"] != "manual_review.test_artifact", "mockup docs should not be treated as test artifacts"
+PY
+
 "$SKILL" "$ROOT_DIR" >/dev/null
 
 echo "OK: typos-skill smoke test passed."
