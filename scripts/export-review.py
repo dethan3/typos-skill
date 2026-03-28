@@ -236,6 +236,84 @@ def detect_dom_selector(line_text: str, char_index: int | None, token: str) -> b
     return False
 
 
+def is_identifier_token(token: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", token))
+
+
+def split_identifier_words(identifier: str) -> list[str]:
+    if not identifier:
+        return []
+
+    parts = re.split(r"[_-]+", identifier)
+    words: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        camel_parts = re.findall(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|\d+", part)
+        if camel_parts:
+            words.extend(camel_parts)
+        else:
+            words.append(part)
+    return words
+
+
+def abbreviate_identifier(identifier: str) -> str:
+    words = split_identifier_words(identifier)
+    letters = [word[0].lower() for word in words if word and word[0].isalpha()]
+    return "".join(letters)
+
+
+def choose_rename_candidate(token: str, rhs_text: str) -> str:
+    candidates = re.findall(r"[A-Za-z_$][A-Za-z0-9_$]*", rhs_text)
+    preferred = []
+    for candidate in candidates:
+        if candidate == token:
+            continue
+        if len(candidate) <= len(token):
+            continue
+        preferred.append(candidate)
+
+    token_abbr = token.lower()
+    matching = [
+        candidate
+        for candidate in preferred
+        if abbreviate_identifier(candidate) == token_abbr
+    ]
+    if matching:
+        matching.sort(key=len, reverse=True)
+        return matching[0]
+
+    if len(preferred) == 1 and len(preferred[0]) >= len(token) + 4:
+        return preferred[0]
+
+    return ""
+
+
+def detect_short_identifier_rename(line_text: str, char_index: int | None, token: str) -> str:
+    if char_index is None or len(token) > 3 or not is_identifier_token(token):
+        return ""
+
+    escaped = re.escape(token)
+    declaration_patterns = (
+        rf"\b(?:const|let|var)\s+({escaped})\b\s*=\s*(.+)",
+        rf"\b({escaped})\b\s*=\s*(.+)",
+    )
+
+    for pattern in declaration_patterns:
+        match = re.search(pattern, line_text)
+        if not match:
+            continue
+
+        start, end = match.span(1)
+        if not (start <= char_index < end):
+            continue
+
+        rhs_text = match.group(2).strip()
+        return choose_rename_candidate(token, rhs_text)
+
+    return ""
+
+
 def choose_word_section(token: str) -> str:
     if re.fullmatch(r"[a-z0-9-]+", token):
         return "default.extend-words"
@@ -285,6 +363,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "KEEP_SOURCE",
             "reason": "Matched a hexadecimal-like token; technical literals should not be auto-corrected.",
+            "rename_candidate": "",
         }
 
     is_url, url_reason = detect_url_or_query(line_text, char_index, token)
@@ -295,6 +374,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "KEEP_SOURCE",
             "reason": f"Matched {url_reason}; URLs and query parameters default to false positives.",
+            "rename_candidate": "",
         }
 
     if detect_css_class(line_text, char_index, token):
@@ -304,6 +384,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "KEEP_SOURCE",
             "reason": "Matched a CSS class or selector-like token; styling identifiers default to false positives.",
+            "rename_candidate": "",
         }
 
     if detect_json_key(line_text, char_index, token):
@@ -313,6 +394,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "KEEP_SOURCE",
             "reason": "Matched a JSON key; data/schema keys default to false positives.",
+            "rename_candidate": "",
         }
 
     if detect_dom_selector(line_text, char_index, token):
@@ -322,6 +404,21 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "KEEP_SOURCE",
             "reason": "Matched a DOM selector; selector strings default to false positives.",
+            "rename_candidate": "",
+        }
+
+    rename_candidate = detect_short_identifier_rename(line_text, char_index, token)
+    if rename_candidate:
+        return {
+            "bucket": "manual_review.rename_candidate",
+            "status": "PENDING",
+            "suggested_status": "FALSE POSITIVE",
+            "preferred_action": "RENAME_SYMBOL",
+            "reason": (
+                f"Matched a short internal variable name; a semantic rename such as "
+                f"'{rename_candidate}' is safer than a spelling auto-fix."
+            ),
+            "rename_candidate": rename_candidate,
         }
 
     if len(token) <= 2:
@@ -331,6 +428,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "REVIEW_SOURCE",
             "reason": "Matched a very short token; short abbreviations have high false-positive risk, so do not auto-fix.",
+            "rename_candidate": "",
         }
 
     if detect_test_artifact(path):
@@ -340,6 +438,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "suggested_status": "FALSE POSITIVE",
             "preferred_action": "CONSIDER_TYPOS_TOML",
             "reason": "Matched snapshot/fixture/mock data; test artifacts default to manual review instead of auto-fix.",
+            "rename_candidate": "",
         }
 
     return {
@@ -348,6 +447,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
         "suggested_status": "ACCEPT CORRECT",
         "preferred_action": "REVIEW_SOURCE",
         "reason": "No conservative false-positive rule matched; review source context before accepting the suggested fix.",
+        "rename_candidate": "",
     }
 
 
@@ -385,6 +485,7 @@ def load_records(path: Path) -> list[dict[str, object]]:
                         "bucket": triage["bucket"],
                         "suggested_status": triage["suggested_status"],
                         "preferred_action": triage["preferred_action"],
+                        "rename_candidate": triage["rename_candidate"],
                         "line_text": context["line_text"],
                         "toml_section": "",
                         "toml_snippet": "",
@@ -412,6 +513,7 @@ def annotate_toml_advice(records: list[dict[str, object]]) -> list[dict[str, obj
             for item in items
             if not str(item["bucket"]).startswith("candidate.")
             and item["bucket"] != "manual_review.test_artifact"
+            and item["bucket"] != "manual_review.rename_candidate"
         ]
         if len(conservative) < 2:
             continue
@@ -491,6 +593,8 @@ def print_records(records: list[dict[str, object]]) -> None:
         print(f"  **Suggested Status**: `{record['suggested_status']}`")
         print(f"  **Preferred Action**: `{record['preferred_action']}`")
         print(f"  **Reason**: {record['reason']}")
+        if record["rename_candidate"]:
+            print(f"  **Rename Candidate**: `{record['rename_candidate']}`")
         line_text = str(record["line_text"]).strip()
         if line_text:
             print(f"  **Line**: `{line_text}`")
