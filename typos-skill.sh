@@ -235,6 +235,7 @@ echo "2. Update each JSON line with:"
 echo "   - status: ACCEPT CORRECT | FALSE POSITIVE | CUSTOM"
 echo "   - correction: required when status is CUSTOM"
 echo "   - reason: keep or refine the explanation for why the item is safe to change or should be skipped"
+echo "   - rename_candidate: if present, prefer a manual symbol rename over typo correction"
 echo '   - prefer `.typos.toml` suggestions for repeated false positives before editing source'
 echo "   - keep byte_offset / occurrence_index unchanged for accurate apply"
 echo "3. Apply with --apply-review <file>"
