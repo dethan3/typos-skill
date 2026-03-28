@@ -6,19 +6,28 @@ description: Run typos CLI on files and produce LLM-reviewable spelling fixes wi
 # Typos Spell Check with LLM Review
 
 Use this skill when the user wants to scan files for spelling errors with the
-`typos` CLI and confirm corrections via LLM before applying changes.
+`typos` CLI and confirm corrections via LLM before applying changes. The export
+step applies conservative built-in triage first so the reviewer does not need
+to improvise basic false-positive rules.
 
 ## Workflow
 
 1. Resolve the absolute path to `typos-skill.sh` in the installed skill
    directory, then run `<skill-dir>/typos-skill.sh --export-review review.jsonl
    [path...]` to generate a review file plus a human-readable summary.
-2. Read file context at the reported path and line; update each JSON line:
+2. Read file context at the reported path and line; use the exported
+   `bucket`, `suggested_status`, `preferred_action`, and `reason` as the
+   default review stance.
+3. Update each JSON line:
    - `status`: `ACCEPT CORRECT`, `FALSE POSITIVE`, or `CUSTOM`
    - `correction`: required when status is `CUSTOM`
-3. Apply approved changes with `<skill-dir>/typos-skill.sh --apply-review
+   - `reason`: keep or refine the explanation for why the item should or
+     should not be changed
+4. Prefer `.typos.toml` suggestions for repeated false positives before
+   editing source one by one.
+5. Apply approved changes with `<skill-dir>/typos-skill.sh --apply-review
    review.jsonl`.
-4. Optional: use `--diff` to preview or `--apply-all` to skip review.
+6. Optional: use `--diff` to preview or `--apply-all` to skip review.
 
 ## Review File Rules
 
@@ -27,6 +36,13 @@ Use this skill when the user wants to scan files for spelling errors with the
   - apply: `ACCEPT`, `ACCEPT CORRECT`, `CUSTOM`
   - skip: `FALSE POSITIVE`, `FALSE POSITIVE?`, `FALSEPOSITIVE`, `SKIP`, `REJECT`
 - `CUSTOM` requires non-empty `correction`.
+- Exported advisory fields:
+  - `bucket`: conservative triage bucket
+  - `suggested_status`: default review decision
+  - `preferred_action`: `REVIEW_SOURCE`, `KEEP_SOURCE`, or `UPDATE_TYPOS_TOML`
+  - `reason`: why the item is safe to change or should be skipped
+  - `toml_section` / `toml_snippet`: suggested `.typos.toml` update when safer
+    than editing source
 - Do not edit locator fields unless you know what you are doing:
   - keep `byte_offset` unchanged
   - keep `occurrence_index` unchanged
@@ -64,5 +80,6 @@ re-exporting review (`--export-review`) from the latest files and re-approving.
 ## Notes
 
 - Script: `typos-skill.sh`
+- Export helper: `scripts/export-review.py`
 - Apply helper: `scripts/apply-review.py`
 - Smoke test: `scripts/smoke-typos-skill.sh`
