@@ -17,6 +17,7 @@ generic and can be adapted to other agent or review-driven environments.
 - Review-first workflow using a structured `review.jsonl` file
 - Conservative built-in false-positive buckets for technical contexts
 - Per-hit `reason`, `bucket`, and `preferred_action` metadata
+- Safe rename suggestions for short internal variables
 - `.typos.toml` suggestions for repeated false positives before source edits
 - Approved-only apply flow instead of blind bulk replacement
 - Batch processing for multiple files and directories
@@ -106,6 +107,7 @@ The core workflow is always the same:
    - mark accepted items as `ACCEPT` or `ACCEPT CORRECT`
    - mark false positives as `FALSE POSITIVE`
    - use `CUSTOM` and set `correction` when you want your own replacement
+   - if `rename_candidate` exists, prefer a manual symbol rename over typo fix
    - prefer `.typos.toml` suggestions when the same false positive repeats
 
 3. Apply approved changes:
@@ -195,6 +197,7 @@ The review file (`review.jsonl`) contains one JSON object per line:
   "bucket": "candidate.source_fix",
   "suggested_status": "ACCEPT CORRECT",
   "preferred_action": "REVIEW_SOURCE",
+  "rename_candidate": "",
   "line_text": "<source line>",
   "toml_section": "",
   "toml_snippet": ""
@@ -222,6 +225,8 @@ Important rules:
   - `false_positive.*`: defaults to `FALSE POSITIVE`
   - `manual_review.*`: do not auto-fix; confirm manually
   - `candidate.source_fix`: likely safe, but still requires review
+- `rename_candidate` means "do not spell-correct this token"; prefer a semantic
+  symbol rename such as `ot -> optionTexts`.
 - Do not modify `byte_offset`, `occurrence_index`, or `line_num` unless you
   understand how locator matching works.
 - `CUSTOM` requires a non-empty `correction`.
@@ -233,6 +238,8 @@ Built-in conservative rules:
   keys, and DOM selectors default to `FALSE POSITIVE`.
 - Very short tokens such as `ot`, `ba`, and `pn` default to manual review and
   are not auto-fixed.
+- Short internal variable names can emit `rename_candidate` advice when the
+  source line suggests a safer semantic rename.
 - Hits in snapshots, fixtures, and mocks default to manual review and prefer
   `.typos.toml` exclusion advice when they repeat.
 
