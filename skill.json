@@ -1,5 +1,5 @@
 {
   "name": "typos",
-  "description": "Find spelling errors using typos CLI and use LLM to confirm corrections",
+  "description": "Find spelling errors with conservative triage, reasons, and .typos.toml advice before applying fixes",
   "version": "0.1.0"
 }
