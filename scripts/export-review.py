@@ -125,20 +125,19 @@ def get_line_context(item: dict[str, object], cache: FileCache) -> dict[str, obj
 
 
 def detect_test_artifact(path: str) -> bool:
-    lowered = path.lower()
-    markers = (
+    candidate = Path(path)
+    lowered_parts = [part.lower() for part in candidate.parts]
+    artifact_dirs = {
         "__snapshots__",
         "__fixtures__",
         "__mocks__",
-        "/snapshots/",
-        "/fixtures/",
-        "/mocks/",
-        ".snap",
-        "snapshot",
-        "fixture",
-        "mock",
-    )
-    return any(marker in lowered for marker in markers)
+        "snapshots",
+        "fixtures",
+        "mocks",
+    }
+    if any(part in artifact_dirs for part in lowered_parts):
+        return True
+    return candidate.name.lower().endswith(".snap")
 
 
 def detect_hex_token(token: str, line_text: str, char_index: int | None) -> bool:
@@ -189,11 +188,10 @@ def detect_json_key(line_text: str, char_index: int | None, token: str) -> bool:
     return False
 
 
-def detect_css_class(line_text: str, char_index: int | None, token: str) -> bool:
+def detect_css_class(path: str, line_text: str, char_index: int | None, token: str) -> bool:
     if char_index is None or not token:
         return False
 
-    token_end = char_index + len(token)
     attr_patterns = (
         r'class(?:Name)?\s*=\s*["\'][^"\']*$',
         r'class(?:Name)?\s*:\s*["\'][^"\']*$',
@@ -203,10 +201,13 @@ def detect_css_class(line_text: str, char_index: int | None, token: str) -> bool
         if re.search(pattern, prefix):
             return True
 
-    for match in re.finditer(r"\.[A-Za-z0-9_-]+", line_text):
-        start, end = match.span()
-        if start < token_end and char_index < end:
-            return True
+    stylesheet_suffixes = {".css", ".scss", ".sass", ".less", ".styl"}
+    if Path(path).suffix.lower() in stylesheet_suffixes:
+        token_end = char_index + len(token)
+        for match in re.finditer(r"\.[A-Za-z0-9_-]+", line_text):
+            start, end = match.span()
+            if start < token_end and char_index < end:
+                return True
 
     return False
 
@@ -283,9 +284,6 @@ def choose_rename_candidate(token: str, rhs_text: str) -> str:
         matching.sort(key=len, reverse=True)
         return matching[0]
 
-    if len(preferred) == 1 and len(preferred[0]) >= len(token) + 4:
-        return preferred[0]
-
     return ""
 
 
@@ -294,24 +292,16 @@ def detect_short_identifier_rename(line_text: str, char_index: int | None, token
         return ""
 
     escaped = re.escape(token)
-    declaration_patterns = (
-        rf"\b(?:const|let|var)\s+({escaped})\b\s*=\s*(.+)",
-        rf"\b({escaped})\b\s*=\s*(.+)",
-    )
+    match = re.search(rf"\b(?:const|let|var)\s+({escaped})\b\s*=\s*(.+)", line_text)
+    if not match:
+        return ""
 
-    for pattern in declaration_patterns:
-        match = re.search(pattern, line_text)
-        if not match:
-            continue
+    start, end = match.span(1)
+    if not (start <= char_index < end):
+        return ""
 
-        start, end = match.span(1)
-        if not (start <= char_index < end):
-            continue
-
-        rhs_text = match.group(2).strip()
-        return choose_rename_candidate(token, rhs_text)
-
-    return ""
+    rhs_text = match.group(2).strip()
+    return choose_rename_candidate(token, rhs_text)
 
 
 def choose_word_section(token: str) -> str:
@@ -377,7 +367,7 @@ def classify(item: dict[str, object], context: dict[str, object]) -> dict[str, o
             "rename_candidate": "",
         }
 
-    if detect_css_class(line_text, char_index, token):
+    if detect_css_class(path, line_text, char_index, token):
         return {
             "bucket": "false_positive.css_class",
             "status": "FALSE POSITIVE",
