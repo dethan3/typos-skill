@@ -1,11 +1,12 @@
-# Typos Skill - AI-Powered Spell Check with LLM Review
+# Typos Skill - Conservative Spell Check with Structured Review
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://clawhub.com)
 
 A portable Skill for agent-assisted typo review. It uses the `typos` CLI to
-detect spelling issues, exports them into a review file, and applies only the
-fixes that were explicitly approved by an LLM or a human reviewer.
+detect spelling issues, applies conservative built-in triage, exports them into
+a review file, and applies only the fixes that were explicitly approved by an
+LLM or a human reviewer.
 
 This Skill is commonly used with Claude Code and Codex, but the workflow is
 generic and can be adapted to other agent or review-driven environments.
@@ -14,10 +15,12 @@ generic and can be adapted to other agent or review-driven environments.
 
 - Automatic spell checking powered by the `typos` CLI
 - Review-first workflow using a structured `review.jsonl` file
+- Conservative built-in false-positive buckets for technical contexts
+- Per-hit `reason`, `bucket`, and `preferred_action` metadata
+- Safe rename suggestions for short internal variables
+- `.typos.toml` suggestions for repeated false positives before source edits
 - Approved-only apply flow instead of blind bulk replacement
-- Diff preview and `--apply-all` shortcuts when you want a faster path
 - Batch processing for multiple files and directories
-- Configurable rules through `.typos.toml`
 
 ## 🚀 Quick Start
 
@@ -100,9 +103,12 @@ The core workflow is always the same:
    ```
 
 2. Review each JSON line in `review.jsonl`:
+   - start from `bucket`, `suggested_status`, `preferred_action`, and `reason`
    - mark accepted items as `ACCEPT` or `ACCEPT CORRECT`
    - mark false positives as `FALSE POSITIVE`
    - use `CUSTOM` and set `correction` when you want your own replacement
+   - if `rename_candidate` exists, prefer a manual symbol rename over typo fix
+   - prefer `.typos.toml` suggestions when the same false positive repeats
 
 3. Apply approved changes:
 
@@ -112,7 +118,8 @@ The core workflow is always the same:
 
 This repository does not automatically call an LLM. The Skill produces a
 reviewable file so Claude Code, Codex, another agent, or a human can make the
-final decision before edits are applied.
+final decision before edits are applied. The export step already applies
+conservative defaults so the reviewer is not starting from a blank slate.
 
 ## 🤖 Using with Claude Code and Codex
 
@@ -185,7 +192,15 @@ The review file (`review.jsonl`) contains one JSON object per line:
   "typo": "<detected-typo>",
   "corrections": ["<suggested-correction>"],
   "status": "PENDING",
-  "correction": ""
+  "correction": "",
+  "reason": "<why this should or should not be changed>",
+  "bucket": "candidate.source_fix",
+  "suggested_status": "ACCEPT CORRECT",
+  "preferred_action": "REVIEW_SOURCE",
+  "rename_candidate": "",
+  "line_text": "<source line>",
+  "toml_section": "",
+  "toml_snippet": ""
 }
 ```
 
@@ -206,10 +221,27 @@ Important rules:
 
 - `PENDING` cannot be applied directly. Change each item to a final review
   status before running `--apply-review`.
+- Exported triage defaults:
+  - `false_positive.*`: defaults to `FALSE POSITIVE`
+  - `manual_review.*`: do not auto-fix; confirm manually
+  - `candidate.source_fix`: likely safe, but still requires review
+- `rename_candidate` means "do not spell-correct this token"; prefer a semantic
+  symbol rename such as `ot -> optionTexts`.
 - Do not modify `byte_offset`, `occurrence_index`, or `line_num` unless you
   understand how locator matching works.
 - `CUSTOM` requires a non-empty `correction`.
 - If files changed after export, re-run `--export-review` before applying.
+
+Built-in conservative rules:
+
+- Hits inside hexadecimal strings, URLs, query parameters, CSS classes, JSON
+  keys, and DOM selectors default to `FALSE POSITIVE`.
+- Very short tokens such as `ot`, `ba`, and `pn` default to manual review and
+  are not auto-fixed.
+- Short internal variable names can emit `rename_candidate` advice when the
+  source line suggests a safer semantic rename.
+- Hits in snapshots, fixtures, and mocks default to manual review and prefer
+  `.typos.toml` exclusion advice when they repeat.
 
 ## ⚙️ Configuration
 
@@ -234,6 +266,21 @@ api = "api"
 cli = "cli"
 ```
 
+For repeated false positives, prefer updating `.typos.toml` before editing
+source one by one. Typical suggestions emitted by this skill include:
+
+```toml
+[default.extend-words]
+"pn" = "pn"
+```
+
+```toml
+[files]
+extend-exclude = [
+  "__snapshots__/**"
+]
+```
+
 ## 🛠 Development
 
 ### Project Structure
@@ -244,6 +291,7 @@ typos-skill/
 ├── skill.json                   # Skill metadata
 ├── typos-skill.sh               # Main entry point
 ├── scripts/
+│   ├── export-review.py         # Conservative triage + review export
 │   ├── apply-review.py          # Applies approved fixes from review.jsonl
 │   └── smoke-typos-skill.sh     # Minimal smoke test
 ├── agents/

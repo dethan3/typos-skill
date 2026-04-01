@@ -203,116 +203,40 @@ if [[ -s "$TYPOS_ERROR_FILE" ]]; then
     echo "" >&2
 fi
 
-# Parse typos and create summary for LLM
+# Parse typos and create review export with conservative triage
 echo ""
 echo "📝 Found spelling errors. Preparing for LLM review..."
 echo ""
 
 PATHS_DISPLAY=$(format_paths "${PATHS[@]}")
 
-"$PYTHON_BIN" - "$TYPOS_OUTPUT_FILE" "${EXPORT_REVIEW_FILE:-}" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-review_path = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
-
-def iter_items(handle):
-    for idx, raw in enumerate(handle, 1):
-        line = raw.strip()
-        if not line:
-            continue
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError as exc:
-            print(f"Error: invalid JSON from typos at line {idx}: {exc}", file=sys.stderr)
-            sys.exit(1)
-        if "typo" not in item or "path" not in item:
-            continue
-        yield item
-
-count = 0
-files = set()
-
-with open(path, "r", encoding="utf-8") as handle:
-    for item in iter_items(handle):
-        count += 1
-        files.add(item.get("path"))
-
-print(f"Found {count} spelling errors in {len(files)} files.")
-print("")
-
-review_handle = None
-if review_path:
-    try:
-        review_handle = open(review_path, "w", encoding="utf-8")
-    except OSError as exc:
-        print(f"Error: cannot write review file '{review_path}': {exc}", file=sys.stderr)
-        sys.exit(1)
-occurrence_counts = {}
-try:
-    with open(path, "r", encoding="utf-8") as handle:
-        for item in iter_items(handle):
-            file_path = item.get("path", "<unknown>")
-            line_num = item.get("line_num", "?")
-            typo = item.get("typo", "")
-            corrections = item.get("corrections", []) or []
-            suggestion_text = ", ".join(corrections)
-            key = (file_path, line_num, typo)
-            occurrence_index = occurrence_counts.get(key, 0) + 1
-            occurrence_counts[key] = occurrence_index
-
-            print(f"### `{file_path}`:{line_num}")
-            print(f"  **Error**: `{typo}`")
-            print(f"  **Suggestions**: [{suggestion_text}]")
-            print("")
-
-            if review_handle:
-                review_item = {
-                    "path": file_path,
-                    "line_num": item.get("line_num"),
-                    "byte_offset": item.get("byte_offset"),
-                    "occurrence_index": occurrence_index,
-                    "typo": typo,
-                    "corrections": corrections,
-                    "status": "PENDING",
-                    "correction": ""
-                }
-                try:
-                    review_handle.write(json.dumps(review_item, ensure_ascii=True) + "\n")
-                except OSError as exc:
-                    print(
-                        f"Error: failed writing review file '{review_path}': {exc}",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-finally:
-    if review_handle:
-        try:
-            review_handle.close()
-        except OSError as exc:
-            print(f"Error: failed closing review file '{review_path}': {exc}", file=sys.stderr)
-            sys.exit(1)
-
-if review_path:
-    print(f"Review file written to: {review_path}")
-    print("")
-PY
+if [[ -n "$EXPORT_REVIEW_FILE" ]]; then
+    "$PYTHON_BIN" "$SCRIPT_DIR/scripts/export-review.py" \
+        "$TYPOS_OUTPUT_FILE" \
+        "$EXPORT_REVIEW_FILE"
+else
+    "$PYTHON_BIN" "$SCRIPT_DIR/scripts/export-review.py" \
+        "$TYPOS_OUTPUT_FILE"
+fi
 
 echo "======================================"
 echo ""
 echo "📋 Instructions for LLM Review:"
 echo ""
-echo "For each error above:"
-echo "1. Read the file at the specified line to understand context"
-echo "2. Determine if it's a TRUE ERROR or FALSE POSITIVE (technical term, variable name, etc.)"
-echo "3. If accepting, provide the correction; if rejecting, explain why"
+echo "The review export already applies conservative built-in triage."
+echo "For each item:"
+echo "1. Read the file at the specified line to confirm the context"
+echo "2. Use bucket / suggested_status / preferred_action / reason as the default decision"
+echo "3. Override only when the source context clearly justifies it"
 echo ""
 echo "Preferred flow:"
 echo "1. Run with --export-review to create a review file"
 echo "2. Update each JSON line with:"
 echo "   - status: ACCEPT CORRECT | FALSE POSITIVE | CUSTOM"
 echo "   - correction: required when status is CUSTOM"
+echo "   - reason: keep or refine the explanation for why the item is safe to change or should be skipped"
+echo "   - rename_candidate: if present, prefer a manual symbol rename over typo correction"
+echo '   - prefer `.typos.toml` suggestions for repeated false positives before editing source'
 echo "   - keep byte_offset / occurrence_index unchanged for accurate apply"
 echo "3. Apply with --apply-review <file>"
 echo ""
